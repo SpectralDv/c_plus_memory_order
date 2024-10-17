@@ -3,6 +3,7 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <mutex>
 
 
 template <typename T>
@@ -20,12 +21,16 @@ public:
         size_t curr_tail = tail.load(std::memory_order_relaxed);
         size_t curr_head = head.load(std::memory_order_acquire);
 
+        mutex.lock();
         if (get_next(curr_tail) == curr_head)
         {
+            mutex.unlock();
             return false;
         }
-
+        
         storage[curr_tail] = std::move(value);
+        mutex.unlock();
+
         tail.store(get_next(curr_tail),std::memory_order_release);
 
         return true;
@@ -36,12 +41,16 @@ public:
         size_t curr_head = head.load(std::memory_order_relaxed);
         size_t curr_tail = tail.load(std::memory_order_acquire);
 
+        mutex.lock();
         if (curr_head == curr_tail)
         {
+            mutex.unlock();
             return false;
         }
 
         value = std::move(storage[curr_head]);
+        mutex.unlock();
+        
         head.store(get_next(curr_head),std::memory_order_release);
 
         return true;
@@ -57,6 +66,7 @@ private:
     std::vector<T> storage;
     std::atomic<size_t> tail;
     std::atomic<size_t> head;
+    std::mutex mutex;
 };
 
 
